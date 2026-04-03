@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Simulation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">STEM Racing Physics Demo</p>
+        <h1>Track Simulation</h1>
+        <p class="hero-text">
+          Upload a race car model, pull in CFD drag coefficient data, and watch the actual car shape sprint down the track using a real time-step physics solver.
+        </p>
+      </div>
+      <div class="hero-status">
+        <div class="status-card">
+          <span class="status-label">Cd Source</span>
+          <strong id="cdSource">Manual input</strong>
+        </div>
+        <div class="status-card">
+          <span class="status-label">Finish Time</span>
+          <strong id="finishTime">Waiting</strong>
+        </div>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="panel controls-panel">
+        <div class="panel-heading">
+          <h2>Launch Controls</h2>
+          <p>Upload a car, tune Cd and area, then launch a full race simulation.</p>
+        </div>
+
+        <div class="control-group upload-group">
+          <label for="carFileInput">Upload Car Model</label>
+          <input id="carFileInput" type="file" accept=".stl,.obj,.ply">
+          <p id="fileStatus" class="control-hint">Supported formats: STL, OBJ, PLY</p>
+          <div class="model-grid">
+            <div class="model-card">
+              <span>Model</span>
+              <strong id="modelName">Default concept car</strong>
+            </div>
+            <div class="model-card">
+              <span>Dimensions</span>
+              <strong id="modelDimensions">Preview body</strong>
+            </div>
+            <div class="model-card">
+              <span>Est. Frontal Area</span>
+              <strong id="modelArea">0.0008 m²</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label for="cdSlider">Drag Coefficient (Cd)</label>
+          <input id="cdSlider" type="range" min="0.05" max="1.2" step="0.005" value="0.32">
+          <div class="control-row">
+            <input id="cdInput" type="number" min="0.05" max="1.2" step="0.005" value="0.32">
+            <button id="useManualCd" class="secondary-button" type="button">Use Manual Cd</button>
+          </div>
+          <p class="control-hint">
+            Future CFD connection target: <code>results.forces.cd</code>
+          </p>
+        </div>
+
+        <div class="control-group">
+          <label for="areaInput">Reference Area (m²)</label>
+          <div class="control-row">
+            <input id="areaInput" type="number" min="0.0001" max="0.01" step="0.0001" value="0.0008">
+            <button id="useModelArea" class="secondary-button" type="button">Use Model Estimate</button>
+          </div>
+          <p class="control-hint">
+            Drag uses <code>0.5 * rho * Cd * A * v²</code>. You can keep the default STEM value or use the uploaded model estimate.
+          </p>
+        </div>
+
+        <div class="button-row">
+          <button id="launchButton" class="launch-button" type="button">🚀 LAUNCH</button>
+          <button id="resetButton" class="secondary-button" type="button">Reset</button>
+        </div>
+
+        <div class="constants-grid">
+          <div class="constant-card"><span>Mass</span><strong>0.05 kg</strong></div>
+          <div class="constant-card"><span>CO2 Thrust</span><strong>12 N</strong></div>
+          <div class="constant-card"><span>Thrust Burst</span><strong>0.08 s</strong></div>
+          <div class="constant-card"><span>Air Density</span><strong>1.225 kg/m³</strong></div>
+          <div class="constant-card"><span>Time Step</span><strong>0.01 s</strong></div>
+          <div class="constant-card"><span>Track Length</span><strong>20 m</strong></div>
+        </div>
+      </section>
+
+      <section class="panel track-panel">
+        <div class="panel-heading">
+          <h2>Race View</h2>
+          <p>Top and side views stay synchronized on the same 20 m run, both driven by the solver state.</p>
+        </div>
+        <div class="race-views">
+          <div class="view-card">
+            <h3>Top View</h3>
+            <canvas id="trackCanvas" aria-label="Top-down race track visualization"></canvas>
+          </div>
+          <div class="view-card">
+            <h3>Side View</h3>
+            <canvas id="sideTrackCanvas" aria-label="Side-view race track visualization"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel metrics-panel">
+        <div class="panel-heading">
+          <h2>Live Metrics</h2>
+          <p>Updated from the simulation loop on every step.</p>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span>Speed</span>
+            <strong id="speedValue">0.00 m/s</strong>
+          </div>
+          <div class="metric-card">
+            <span>Time</span>
+            <strong id="timeValue">0.00 s</strong>
+          </div>
+          <div class="metric-card">
+            <span>Distance</span>
+            <strong id="distanceValue">0.00 m</strong>
+          </div>
+          <div class="metric-card">
+            <span>Drag Force</span>
+            <strong id="dragValue">0.000 N</strong>
+          </div>
+          <div class="metric-card">
+            <span>Acceleration</span>
+            <strong id="accelValue">0.00 m/s²</strong>
+          </div>
+          <div class="metric-card">
+            <span>Thrust</span>
+            <strong id="thrustValue">0.00 N</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel telemetry-panel">
+        <div class="panel-heading">
+          <h2>Telemetry Graphs</h2>
+          <p>Multiple live plots from the same physics engine, not hardcoded curves.</p>
+        </div>
+        <div class="graphs-grid">
+          <div class="graph-card">
+            <h3>Speed vs Time</h3>
+            <canvas id="speedGraphCanvas" aria-label="Speed versus time graph"></canvas>
+          </div>
+          <div class="graph-card">
+            <h3>Distance vs Time</h3>
+            <canvas id="distanceGraphCanvas" aria-label="Distance versus time graph"></canvas>
+          </div>
+          <div class="graph-card">
+            <h3>Drag Force vs Time</h3>
+            <canvas id="dragGraphCanvas" aria-label="Drag force versus time graph"></canvas>
+          </div>
+          <div class="graph-card">
+            <h3>Acceleration vs Time</h3>
+            <canvas id="accelGraphCanvas" aria-label="Acceleration versus time graph"></canvas>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./script.js"></script>
+</body>
+</html>
